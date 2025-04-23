@@ -77,11 +77,17 @@ def create_random_addresses(count=10):
     
     for i in range(1, count+1):
         host_id = str(i).zfill(4)
-        random_host = random.randint(1, 16777214)
+        
+        a = random.randint(1, 254)
+        b = random.randint(0, 254)
+        c = random.randint(0, 254)
+        d = random.randint(1, 254)
+        
+        mask = 32
         
         address = {
             'name': f"host_{host_id}",
-            'subnet': f"10.0.0.0/{random_host}/32",
+            'subnet': f"{a}.{b}.{c}.{d}/{mask}",
             'comment': f"Host #{i} created for TEST via pyfmg on {time.strftime('%Y-%m-%d')}",
         }
         
@@ -94,7 +100,7 @@ def main():
     if len(sys.argv) > 1:
         csv_file = sys.argv[1]
     
-    with FortiManager(FMG_IP, USERNAME, PASSWORD, disable_request_warning=False) as fmg:
+    with FortiManager(FMG_IP, USERNAME, PASSWORD) as fmg:
         fmg.login()
         
         fmg.lock_adom(ADOM)
