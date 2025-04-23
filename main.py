@@ -9,6 +9,7 @@ FMG_IP = os.getenv('FMG_IP')
 USERNAME = os.getenv('USERNAME')
 PASSWORD = os.getenv('PASSWORD')
 ADOM = os.getenv('ADOM')
+API_KEY = os.getenv('API_KEY')
 
 def create_firewall_address(fmg, name, subnet_cidr, comment="", color=None):
     net = ipaddress.ip_network(subnet_cidr, strict=False)
@@ -100,41 +101,49 @@ def main():
     if len(sys.argv) > 1:
         csv_file = sys.argv[1]
     
-    with FortiManager(FMG_IP, USERNAME, PASSWORD) as fmg:
+    if API_KEY:
+        fmg = FortiManager(FMG_IP, vdom=ADOM)
+        fmg.token = API_KEY
+        print("Using API KEY authentication...")
+    else:
+        fmg = FortiManager(FMG_IP, USERNAME, PASSWORD)
+        print("Using username/password authentication...")
         fmg.login()
-        
-        fmg.lock_adom(ADOM)
-        try:
-            if csv_file:
-                print(f"Reading addresses from {csv_file}...")
-                addresses = read_csv_addresses(csv_file)
-                if not addresses:
-                    print("No valid addresses found in CSV. Using random addresses.")
-                    addresses = create_random_addresses()
-            else:
-                print("No CSV file specified. Generating random addresses...")
+    
+    fmg.lock_adom(ADOM)
+    try:
+        if csv_file:
+            print(f"Reading addresses from {csv_file}...")
+            addresses = read_csv_addresses(csv_file)
+            if not addresses:
+                print("No valid addresses found in CSV. Using random addresses.")
                 addresses = create_random_addresses()
+        else:
+            print("No CSV file specified. Generating random addresses...")
+            addresses = create_random_addresses()
+        
+        print(f"Creating {len(addresses)} addresses on FortiManager...")
+        for address in addresses:
+            name = address['name']
+            subnet = address['subnet']
+            comment = address['comment']
+            color = address.get('color')
             
-            print(f"Creating {len(addresses)} addresses on FortiManager...")
-            for address in addresses:
-                name = address['name']
-                subnet = address['subnet']
-                comment = address['comment']
-                color = address.get('color')
-                
-                print(f"Creating address: {name} ({subnet})...")
-                code, resp = create_firewall_address(fmg, name, subnet, comment, color)
-                
-                if code == 0:
-                    print(f"  Success: {name} created successfully.")
-                else:
-                    print(f"  Failure: Unable to create {name}. Code: {code}")
+            print(f"Creating address: {name} ({subnet})...")
+            code, resp = create_firewall_address(fmg, name, subnet, comment, color)
             
-            print("Operation completed.")
-                
-        finally:
-            fmg.commit_changes(ADOM)
-            fmg.unlock_adom(ADOM)
+            if code == 0:
+                print(f"  Success: {name} created successfully.")
+            else:
+                print(f"  Failure: Unable to create {name}. Code: {code}")
+        
+        print("Operation completed.")
+            
+    finally:
+        fmg.commit_changes(ADOM)
+        fmg.unlock_adom(ADOM)
+        if not API_KEY:
+            fmg.logout()
 
 if __name__ == "__main__":
     main()
